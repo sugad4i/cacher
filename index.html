@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>CSV集計ツール ver0.0.2</title>
+  <title>CSV集計ツール ver0.0.3</title>
   <style>
     #header {
       display: flex;
@@ -25,7 +25,7 @@
 <body>
 
 <div id="header">
-  <h1>CSV集計ツール ver0.0.2</h1>
+  <h1>CSV集計ツール ver0.0.3</h1>
   <span>更新日: 2025/04/27</span>
 </div>
 
@@ -55,16 +55,31 @@ function processSimpleSum(data) {
         return;
     }
 
+    // 販売商品数の列名を探す（スペースずれ対策）
+    let countColumnName = null;
+    const keys = Object.keys(data[0]);
+    for (const key of keys) {
+        if (key.replace(/\s/g, '').includes('販売商品数')) {
+            countColumnName = key;
+            break;
+        }
+    }
+    if (!countColumnName) {
+        document.getElementById('output').innerHTML = '<p>販売商品数の列が見つかりません</p>';
+        return;
+    }
+
     let salesSum = 0;
     let returnSum = 0;
 
     data.forEach(row => {
-        const count = parseFloat(row['販売商品数']) || 0;
+        const rawCount = row[countColumnName];
+        const count = parseFloat(rawCount) || 0;
 
         if (count > 0) {
             salesSum += count;
         } else if (count < 0) {
-            returnSum += count; // マイナスなので加算（つまり引き算）
+            returnSum += count; // マイナスだから加算（引き算と同じ意味）
         }
     });
 
