@@ -2,164 +2,130 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>キャッシャー集計 ver0.5.7</title>
+<title>キャッシャー集計 ver0.6.0</title>
 <style>
  body{font-family:monospace;margin:20px}
- #header{display:flex;justify-content:space-between;align-items:center;
-         border-bottom:1px solid #ccc;padding-bottom:8px}
+ #header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ccc;padding-bottom:8px}
  table{border-collapse:collapse;margin-top:18px}
- th,td{padding:4px 8px;border:1px solid #aaa}
+ th,td{border:1px solid #aaa;padding:4px 8px}
  th{background:#eee}
- input[type=number]{width:70px;text-align:right}
- #totalPrice{margin:18px 0;font-size:22px;font-weight:bold;color:#c00}
- #output{white-space:pre;margin-top:20px}
- #copyBtn{padding:8px 18px;font-size:16px}
+ input[type=number]{width:80px;text-align:right}
+ #total{font-size:22px;font-weight:bold;color:#c00;margin:18px 0}
+ #output{white-space:pre;margin-top:18px}
+ #copyBtn{padding:8px 20px;font-size:16px}
 </style>
 </head>
 <body>
 
 <div id="header">
-  <h1>キャッシャー集計 ver0.5.7</h1>
-  <span>更新日 2025/04/27</span>
+  <h1>キャッシャー集計 ver0.6.0</h1><span id="upd"></span>
 </div>
 
-<input type="file" id="csvFile" accept=".csv">
+<input type="file" id="csv" accept=".csv">
 
-<table id="priceTable">
-  <thead><tr><th>カテゴリ / 商品名</th><th>人数</th><th>単価(円)</th></tr></thead>
-  <tbody id="priceBody"></tbody>
-</table>
+<table id="tbl"><thead><tr><th>カテゴリー / 商品名</th><th>人数</th><th>単価 (円)</th></tr></thead><tbody></tbody></table>
 
-<div id="totalPrice"></div>
+<div id="total"></div>
 <div id="output"></div>
-<button id="copyBtn" onclick="copyText()">コピー</button>
+<button id="copyBtn" onclick="copyTxt()">コピー</button>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 <script>
-/* ------ 固定カテゴリ ------ */
-const fixedCats={
-  '22m':'22-1 男性','22w':'22-1 女性',
-  'localm':'ローカル男性','localw':'ローカル女性',
-  'localgm':'ローカルG男性','localgw':'ローカルG女性',
-  'gm':'G男性','gw':'G女性',
-  'guestm':'ゲスト男性','guestw':'ゲスト女性',
-  '22guestm':'22:00-1:00ゲスト男性','22guestw':'22:00-1:00ゲスト女性'
-};
-let count={},otherItems={},reEntry=0;
+const tbody=document.querySelector('#tbl tbody');
+let catMap={}, others={}, reEntry=0;   // 集計
+document.getElementById('upd').textContent='更新 '+new Date().toLocaleDateString();
 
-/* CSV 選択 */
-document.getElementById('csvFile').addEventListener('change',e=>{
+/* CSV読み込み */
+document.getElementById('csv').addEventListener('change',e=>{
   const f=e.target.files[0]; if(!f) return;
-  const rd=new FileReader();
-  rd.onload=v=>{
-    const txt=new TextDecoder('shift-jis').decode(v.target.result);
-    Papa.parse(txt,{header:true,skipEmptyLines:true,
-      complete:r=>{
-        reset();
-        parseRows(r.data);
-        buildTable();
-        recalc();
-      }});
-  };
-  rd.readAsArrayBuffer(f);
+  new Response(f).arrayBuffer().then(buf=>{
+    const txt=new TextDecoder('shift-jis').decode(buf);
+    Papa.parse(txt,{header:true,skipEmptyLines:true,complete:r=>{
+      aggregate(r.data);
+      buildRows();
+      calc();
+    }});
+  });
 });
 
-/* 初期化 */
-function reset(){
-  count={}; Object.keys(fixedCats).forEach(k=>count[k]=0);
-  reEntry=0; otherItems={};
-}
-
-/* 行解析 */
-function parseRows(rows){
-  const colCnt=rows[0]&&Object.keys(rows[0]).find(k=>k.replace(/\s/g,'').includes('販売商品数'));
+/* ---------- 集計 ---------- */
+function aggregate(rows){
+  catMap={}; others={}; reEntry=0;
+  const cntCol=rows[0] && Object.keys(rows[0]).find(k=>k.replace(/\s/g,'').includes('販売商品数'));
   rows.forEach(row=>{
     const cat=(row['カテゴリー']||'').trim();
     let name=(row['商品名']||'').trim().replace(/22~1/g,'22-1');
-    const qty=parseFloat(row[colCnt])||0;
-    if(!qty) return;
+    const n=+row[cntCol]||0; if(!n) return;
 
     if(cat==='その他'){
-      if(name.includes('再入場')){reEntry+=qty;}
+      if(name.includes('再入場'))           reEntry+=n;
       else{
-        if(!otherItems[name]) otherItems[name]={cnt:0,price:0};
-        otherItems[name].cnt+=qty;
+        if(!others[name]) others[name]=0;
+        others[name]+=n;
       }
-      return;
+    }else{
+      if(!catMap[cat]) catMap[cat]=0;
+      catMap[cat]+=n;
     }
-    /* 固定カテゴリ */
-    if(cat.includes('22-1')&&cat.includes('男性')&&!cat.includes('ゲスト'))       count['22m']+=qty;
-    else if(cat.includes('22-1')&&cat.includes('女性')&&!cat.includes('ゲスト'))  count['22w']+=qty;
-    else if(cat.includes('22-1')&&cat.includes('ゲスト')&&cat.includes('男性'))   count['22guestm']+=qty;
-    else if(cat.includes('22-1')&&cat.includes('ゲスト')&&cat.includes('女性'))   count['22guestw']+=qty;
-    else if(cat.includes('ローカルG男性')) count['localgm']+=qty;
-    else if(cat.includes('ローカルG女性')) count['localgw']+=qty;
-    else if(cat.includes('ローカル男性'))  count['localm'] +=qty;
-    else if(cat.includes('ローカル女性'))  count['localw'] +=qty;
-    else if(cat==='G男性') count['gm']+=qty;
-    else if(cat==='G女性') count['gw']+=qty;
-    else if(cat==='ゲスト男性') count['guestm']+=qty;
-    else if(cat==='ゲスト女性') count['guestw']+=qty;
   });
 }
 
-/* テーブル生成 */
-function buildTable(){
-  const body=document.getElementById('priceBody');
-  body.innerHTML='';
-  /* 固定 */
-  Object.keys(fixedCats).forEach(k=>{
-    body.appendChild(makeRow(fixedCats[k],count[k],'price_'+k));
+/* ----------  表生成  ---------- */
+function buildRows(){
+  tbody.innerHTML='';
+  /* カテゴリー行 */
+  Object.keys(catMap).forEach(cat=>{
+    tbody.appendChild(makeRow(cat,catMap[cat],'p_'+hash(cat)));
   });
-  /* その他 */
-  Object.keys(otherItems).forEach(n=>{
-    const id='price_other_'+n.replace(/\s+/g,'_').replace(/[^\w\-]/g,'');
-    body.appendChild(makeRow(n,otherItems[n].cnt,id));
+  /* “その他” 行（商品名ごと） */
+  Object.keys(others).forEach(name=>{
+    tbody.appendChild(makeRow(name,others[name],'p_'+hash(name)));
   });
-  /* 再入場(固定500円) */
-  body.appendChild(makeRow('再入場',reEntry,null,500,true));
+  /* 再入場（固定500円） */
+  tbody.appendChild(makeRow('再入場',reEntry,null,500,true));
+
   /* 価格入力ハンドラ */
-  body.querySelectorAll('input[type=number]').forEach(inp=>inp.oninput=recalc);
+  tbody.querySelectorAll('input[type=number]').forEach(i=>i.oninput=calc);
 }
 
-/* 行要素 */
-function makeRow(label,cnt,id,init=0,disabled=false){
+/* row 要素 */
+function makeRow(label,cnt,id,init=0,lock=false){
   const tr=document.createElement('tr');
-  tr.innerHTML=`<td>${label}</td><td>${cnt}</td>
-                <td>${disabled?init:`<input type="number" id="${id}" value="${init}">`}</td>`;
+  tr.innerHTML=
+    `<td>${label}</td><td>${cnt}</td><td>${lock?init:`<input type="number" id="${id}" value="${init}">`}</td>`;
   return tr;
 }
+function hash(s){return btoa(unescape(encodeURIComponent(s))).replace(/=+$/,'');}
 
-/* 再計算 */
-function recalc(){
+/* ---------- 計算 & 表示 ---------- */
+function calc(){
   let sum=0;
-  /* 固定 */
-  Object.keys(fixedCats).forEach(k=>{
-    const price=+document.getElementById('price_'+k).value||0;
-    sum+=count[k]*price;
+  /* カテゴリ単価 */
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    const label=tr.cells[0].textContent.trim();
+    const qty=+tr.cells[1].textContent;
+    let price=0;
+    const inp=tr.querySelector('input');
+    if(inp) price=+inp.value||0;              // 可変
+    else if(label==='再入場') price=500;      // 固定
+    sum+=qty*price;
   });
-  /* その他 */
-  Object.keys(otherItems).forEach(n=>{
-    const id='price_other_'+n.replace(/\s+/g,'_').replace(/[^\w\-]/g,'');
-    const price=+document.getElementById(id).value||0;
-    sum+=otherItems[n].cnt*price;
-  });
-  /* 再入場 */
-  sum+=reEntry*500;
-  document.getElementById('totalPrice').textContent=`合計金額: ${sum.toLocaleString()} 円`;
+  document.getElementById('total').textContent=`合計金額: ${sum.toLocaleString()} 円`;
 
-  /* コピー本文（例として人数合計だけ簡潔に） */
-  const totalPeople=Object.values(count).reduce((a,b)=>a+b,0)+
-                    Object.values(otherItems).reduce((a,b)=>a+b.cnt,0);
+  /* コピー用本文 (簡易) */
+  const totalPeople=[...tbody.rows].reduce((a,tr)=>a+ +tr.cells[1].textContent,0)-reEntry; //再入場除く
   document.getElementById('output').textContent=
-      `キャッシャー集計\n\n${getYesterdayDate()}\n\n総人数:${totalPeople}`;
+    `キャッシャー集計\n\n${yesterday()}\n\n総人数:${totalPeople}`;
 }
 
-/* コピー */
-function copyText(){
+/* ---------- ユーティリティ ---------- */
+function yesterday(){
+  const d=new Date(); d.setDate(d.getDate()-1);
+  return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+}
+function copyTxt(){
   navigator.clipboard.writeText(document.getElementById('output').textContent)
-    .then(()=>alert('コピー完了！'))
-    .catch(()=>alert('コピー失敗…'));
+    .then(()=>alert('コピー完了！')).catch(()=>alert('コピー失敗…'));
 }
 </script>
 </body>
