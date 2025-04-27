@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>キャッキャー集計 ver0.2.0</title>
+  <title>キャッキャー集計 ver0.4.0</title>
   <style>
     #header {
       display: flex;
@@ -22,10 +22,14 @@
     }
     #output {
       margin-top: 30px;
-      white-space: pre-line;
+      white-space: pre;
       font-family: monospace;
     }
     input[type="number"] {
+      width: 40px;
+      text-align: center;
+    }
+    .number-input {
       width: 40px;
       text-align: center;
     }
@@ -34,7 +38,7 @@
 <body>
 
 <div id="header">
-  <h1>キャッキャー集計 ver0.2.0</h1>
+  <h1>キャッキャー集計 ver0.4.0</h1>
   <span>更新日: 2025/04/27</span>
 </div>
 
@@ -45,6 +49,7 @@
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 <script>
 let shopData = {};
+let summaryData = {};
 
 document.getElementById('csvFileInput').addEventListener('change', function(event) {
     const file = event.target.files[0];
@@ -85,8 +90,10 @@ function processData(data) {
     let foreignDoor = 0;
     let doorLate = 0;
     let foreignDoorLate = 0;
-    let shopGuest = 0;
-    let shopFree = 0;
+    let total = 0;
+    let maleTotal = 0;
+    let femaleTotal = 0;
+    let foreignTotal = 0;
     shopData = {};
 
     let countColumn = null;
@@ -105,11 +112,24 @@ function processData(data) {
         const originalItem = row['商品名']?.trim();
         if (!originalItem) return;
         const count = parseFloat(row[countColumn]) || 0;
-
         const itemFixed = originalItem.replace(/22~1/g, '22-1');
         const normalizedItem = itemFixed.replace(/^22-1\s*/, '');
 
-        // Door集計
+        if (!itemFixed.includes('再入場')) {
+            total += count;
+        }
+
+        if (itemFixed.includes('G男性') || itemFixed.includes('G女性')) {
+            foreignTotal += count;
+        }
+
+        if (itemFixed.includes('男性')) {
+            maleTotal += count;
+        }
+        if (itemFixed.includes('女性')) {
+            femaleTotal += count;
+        }
+
         if (itemFixed.includes('G男性') || itemFixed.includes('G女性')) {
             if (itemFixed.includes('22-1')) {
                 foreignDoorLate += count;
@@ -124,7 +144,6 @@ function processData(data) {
             }
         }
 
-        // 店舗ごと
         const shopMatch = normalizedItem.match(/^(.+?)(ゲスト|フリー)(男性|女性)?$/);
         if (shopMatch) {
             const shopName = shopMatch[1].trim();
@@ -133,11 +152,16 @@ function processData(data) {
             if (type === 'ゲスト') {
                 shopData[shopName].guest += count;
             }
-            // フリー人数は手打ちで入力するためここでは加算しない
         }
     });
 
+    summaryData = { total, foreignTotal, maleTotal, femaleTotal };
+
     generateOutput(door, foreignDoor, doorLate, foreignDoorLate);
+}
+
+function padLabel(label, width = 20) {
+    return (label + ' '.repeat(width)).slice(0, width);
 }
 
 function generateOutput(door, foreignDoor, doorLate, foreignDoorLate) {
@@ -145,15 +169,19 @@ function generateOutput(door, foreignDoor, doorLate, foreignDoorLate) {
 
     html += 'キャッキャー集計\n\n';
     html += `${getYesterdayDate()}\n\n`;
-    html += `Door : ${Math.round(door)}\n`;
-    html += `外国人Door: ${Math.round(foreignDoor)}\n`;
-    html += `22:00-1:00 Door: ${Math.round(doorLate)}\n`;
-    html += `22:00-1:00 外国人Door: ${Math.round(foreignDoorLate)}\n`;
-    html += `店ゲスト : [<input type="number" id="shopGuestInput" value="0" onchange="updateTotal()">]\n`;
-    html += `店フリー: [<input type="number" id="shopFreeInput" value="0" onchange="updateTotal()">]\n\n`;
+
+    html += `総数:${Math.round(summaryData.total)}(外国人${Math.round(summaryData.foreignTotal)}人)\n`;
+    html += `M:${Math.round(summaryData.maleTotal)} W:${Math.round(summaryData.femaleTotal)}\n\n`;
+
+    html += `${padLabel('Door')} : ${Math.round(door)}\n`;
+    html += `${padLabel('外国人Door')} : ${Math.round(foreignDoor)}\n`;
+    html += `${padLabel('22:00-1:00 Door')} : ${Math.round(doorLate)}\n`;
+    html += `${padLabel('22:00-1:00 外国人Door')} : ${Math.round(foreignDoorLate)}\n`;
+    html += `${padLabel('店ゲスト')} : [<input type="number" id="shopGuestInput" value="0" onchange="updateTotal()">]\n`;
+    html += `${padLabel('店フリー')} : [<input type="number" id="shopFreeInput" value="0" onchange="updateTotal()">]\n\n`;
 
     for (const [shop, { guest }] of Object.entries(shopData)) {
-        const id = shop.replace(/\s+/g, '_'); // 空白をIDにできるよう置換
+        const id = shop.replace(/\s+/g, '_');
         html += `${shop}\n　<span id="total_${id}">${guest}</span>（ゲスト${Math.round(guest)} フリー[<input type="number" id="free_${id}" value="0" onchange="updateShopTotal('${id}', ${guest})">]）\n\n`;
     }
 
@@ -163,7 +191,6 @@ function generateOutput(door, foreignDoor, doorLate, foreignDoorLate) {
 function updateTotal() {
     const guest = parseInt(document.getElementById('shopGuestInput').value) || 0;
     const free = parseInt(document.getElementById('shopFreeInput').value) || 0;
-    // ここでは必要ならゲスト＋フリーの合計など出力できる
 }
 
 function updateShopTotal(id, guest) {
