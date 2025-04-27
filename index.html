@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>キャッシャー集計 ver0.5.1</title>
+  <title>キャッシャー集計 ver0.5.3</title>
   <style>
     body {
       font-family: monospace;
@@ -23,11 +23,11 @@
       margin-bottom: 10px;
     }
     label {
-      width: 180px;
+      width: 200px;
       display: inline-block;
     }
     input[type="number"] {
-      width: 60px;
+      width: 80px;
       text-align: center;
     }
     #output {
@@ -42,9 +42,10 @@
       margin-right: 10px;
     }
     #totalPrice {
-      font-size: 20px;
+      font-size: 22px;
       font-weight: bold;
       color: red;
+      margin-top: 20px;
       margin-bottom: 20px;
     }
   </style>
@@ -52,40 +53,52 @@
 <body>
 
 <div id="header">
-  <h1>キャッシャー集計 ver0.5.1</h1>
+  <h1>キャッシャー集計 ver0.5.3</h1>
   <span>更新日: 2025/04/27</span>
 </div>
 
 <input type="file" id="csvFileInput" accept=".csv" />
 
 <div id="inputs">
-  <h2>人数入力＆料金設定</h2>
-  <div class="input-group"><label>22-1 男性:</label><input type="number" id="i_22m" value="0"></div>
-  <div class="input-group"><label>22-1 女性:</label><input type="number" id="i_22w" value="0"></div>
-  <div class="input-group"><label>ローカル男性:</label><input type="number" id="i_localm" value="0"></div>
-  <div class="input-group"><label>ローカル女性:</label><input type="number" id="i_localw" value="0"></div>
-  <div class="input-group"><label>ローカルG男性:</label><input type="number" id="i_localgm" value="0"></div>
-  <div class="input-group"><label>ローカルG女性:</label><input type="number" id="i_localgw" value="0"></div>
-  <div class="input-group"><label>G男性:</label><input type="number" id="i_gm" value="0"></div>
-  <div class="input-group"><label>G女性:</label><input type="number" id="i_gw" value="0"></div>
-  <div class="input-group"><label>ゲスト男性:</label><input type="number" id="i_guestm" value="0"></div>
-  <div class="input-group"><label>ゲスト女性:</label><input type="number" id="i_guestw" value="0"></div>
-  <div class="input-group"><label>22:00-1:00ゲスト男性:</label><input type="number" id="i_22guestm" value="0"></div>
-  <div class="input-group"><label>22:00-1:00ゲスト女性:</label><input type="number" id="i_22guestw" value="0"></div>
-  <div class="input-group"><label>1人あたり料金 (円):</label><input type="number" id="i_price" value="0"></div>
+  <h2>カテゴリごとの料金設定</h2>
+  <div class="input-group"><label>22-1 男性 料金:</label><input type="number" id="price_22m" value="0"></div>
+  <div class="input-group"><label>22-1 女性 料金:</label><input type="number" id="price_22w" value="0"></div>
+  <div class="input-group"><label>ローカル男性 料金:</label><input type="number" id="price_localm" value="0"></div>
+  <div class="input-group"><label>ローカル女性 料金:</label><input type="number" id="price_localw" value="0"></div>
+  <div class="input-group"><label>ローカルG男性 料金:</label><input type="number" id="price_localgm" value="0"></div>
+  <div class="input-group"><label>ローカルG女性 料金:</label><input type="number" id="price_localgw" value="0"></div>
+  <div class="input-group"><label>G男性 料金:</label><input type="number" id="price_gm" value="0"></div>
+  <div class="input-group"><label>G女性 料金:</label><input type="number" id="price_gw" value="0"></div>
+  <div class="input-group"><label>ゲスト男性 料金:</label><input type="number" id="price_guestm" value="0"></div>
+  <div class="input-group"><label>ゲスト女性 料金:</label><input type="number" id="price_guestw" value="0"></div>
+  <div class="input-group"><label>22:00-1:00ゲスト男性 料金:</label><input type="number" id="price_22guestm" value="0"></div>
+  <div class="input-group"><label>22:00-1:00ゲスト女性 料金:</label><input type="number" id="price_22guestw" value="0"></div>
 </div>
 
 <button id="generateButton" onclick="generateOutput()">出力</button>
 <button id="copyButton" onclick="copyText()">コピー</button>
 
 <div id="totalPrice"></div>
-
 <div id="output"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 <script>
 let shopData = {};
 let summaryData = {};
+let categoryCount = {
+  '22m': 0,
+  '22w': 0,
+  'localm': 0,
+  'localw': 0,
+  'localgm': 0,
+  'localgw': 0,
+  'gm': 0,
+  'gw': 0,
+  'guestm': 0,
+  'guestw': 0,
+  '22guestm': 0,
+  '22guestw': 0
+};
 
 document.getElementById('csvFileInput').addEventListener('change', function(event) {
   const file = event.target.files[0];
@@ -122,10 +135,7 @@ function padLeft(str, length) {
 }
 
 function processCSVData(data) {
-  if (!data || data.length === 0) {
-    document.getElementById('output').innerText = 'データが空です';
-    return;
-  }
+  Object.keys(categoryCount).forEach(key => categoryCount[key] = 0);
 
   let door = 0, foreignDoor = 0, doorLate = 0, foreignDoorLate = 0;
   let total = 0, maleTotal = 0, femaleTotal = 0, foreignTotal = 0;
@@ -159,6 +169,19 @@ function processCSVData(data) {
       else door += count;
     }
 
+    if (itemFixed.includes('22-1ゲスト男性')) categoryCount['22guestm'] += count;
+    else if (itemFixed.includes('22-1ゲスト女性')) categoryCount['22guestw'] += count;
+    else if (itemFixed.includes('22-1男性')) categoryCount['22m'] += count;
+    else if (itemFixed.includes('22-1女性')) categoryCount['22w'] += count;
+    else if (itemFixed.includes('ローカルG男性')) categoryCount['localgm'] += count;
+    else if (itemFixed.includes('ローカルG女性')) categoryCount['localgw'] += count;
+    else if (itemFixed.includes('ローカル男性')) categoryCount['localm'] += count;
+    else if (itemFixed.includes('ローカル女性')) categoryCount['localw'] += count;
+    else if (itemFixed.includes('G男性')) categoryCount['gm'] += count;
+    else if (itemFixed.includes('G女性')) categoryCount['gw'] += count;
+    else if (itemFixed.includes('ゲスト男性')) categoryCount['guestm'] += count;
+    else if (itemFixed.includes('ゲスト女性')) categoryCount['guestw'] += count;
+
     const shopMatch = normalizedItem.match(/^(.+?)(ゲスト|フリー)(男性|女性)?$/);
     if (shopMatch) {
       const shopName = shopMatch[1].trim();
@@ -172,13 +195,24 @@ function processCSVData(data) {
 }
 
 function generateOutput() {
-  const ids = [
-    'i_22m', 'i_22w', 'i_localm', 'i_localw', 'i_localgm', 'i_localgw',
-    'i_gm', 'i_gw', 'i_guestm', 'i_guestw', 'i_22guestm', 'i_22guestw'
-  ];
-  let totalPeople = ids.reduce((sum, id) => sum + (parseInt(document.getElementById(id).value) || 0), 0);
-  let price = parseInt(document.getElementById('i_price').value) || 0;
-  let totalPrice = totalPeople * price;
+  const prices = {
+    '22m': parseInt(document.getElementById('price_22m').value) || 0,
+    '22w': parseInt(document.getElementById('price_22w').value) || 0,
+    'localm': parseInt(document.getElementById('price_localm').value) || 0,
+    'localw': parseInt(document.getElementById('price_localw').value) || 0,
+    'localgm': parseInt(document.getElementById('price_localgm').value) || 0,
+    'localgw': parseInt(document.getElementById('price_localgw').value) || 0,
+    'gm': parseInt(document.getElementById('price_gm').value) || 0,
+    'gw': parseInt(document.getElementById('price_gw').value) || 0,
+    'guestm': parseInt(document.getElementById('price_guestm').value) || 0,
+    'guestw': parseInt(document.getElementById('price_guestw').value) || 0,
+    '22guestm': parseInt(document.getElementById('price_22guestm').value) || 0,
+    '22guestw': parseInt(document.getElementById('price_22guestw').value) || 0,
+  };
+
+  let totalPrice = Object.keys(categoryCount).reduce((sum, key) => {
+    return sum + (categoryCount[key] * prices[key]);
+  }, 0);
 
   document.getElementById('totalPrice').innerText = `合計金額: ${totalPrice.toLocaleString()} 円`;
 
@@ -193,7 +227,6 @@ function generateOutput() {
   html += `${padRight('22:00-1:00 外国人Door', 20)}: ${padLeft(Math.round(summaryData.foreignDoorLate), 4)}\n\n`;
 
   for (const [shop, { guest }] of Object.entries(shopData)) {
-    const id = shop.replace(/\s+/g, '_');
     html += `${shop}\n　${padLeft(guest, 3)}（ゲスト${padLeft(guest, 3)} フリー[0]）\n\n`;
   }
 
