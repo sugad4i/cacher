@@ -15,7 +15,7 @@
 </head>
 <body>
 
-<div id="head"><h1>料金計算ツール ver0.2.1</h1><span id="upd"></span></div>
+<div id="head"><h1>料金計算ツール ver0.2.1.1</h1><span id="upd"></span></div>
 
 <input type="file" id="csv" accept=".csv">
 
@@ -126,4 +126,18 @@ function buildTable(arr){
 /* ③ 合計金額を計算 */
 function calc(){
   let sum=0;
-  tbody.querySelectorAll('tr').for
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    const label = tr.cells[0].textContent.trim();
+    const num   = +tr.cells[1].textContent;
+    let price   = 0;
+    const inp   = tr.querySelector('input');
+    if(inp)      price = +inp.value||0;
+    else if(label.includes('フリー')) price = 0;
+    sum += num * price;
+  });
+  document.getElementById('total').textContent =
+        `合計金額: ${sum.toLocaleString()} 円`;
+}
+</script>
+</body>
+</html>
