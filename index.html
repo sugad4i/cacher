@@ -2,80 +2,50 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>キャッシャー集計 ver0.5.5</title>
+  <title>キャッシャー集計 ver0.5.6</title>
   <style>
-    body {
-      font-family: monospace;
-      margin: 20px;
-    }
-    #header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #ccc;
-    }
-    #inputs {
-      margin-top: 20px;
-      margin-bottom: 20px;
-    }
-    .input-group {
-      margin-bottom: 5px;
-    }
-    label {
-      width: 200px;
-      display: inline-block;
-    }
-    input[type="number"] {
-      width: 80px;
-      text-align: center;
-    }
-    #output {
-      margin-top: 20px;
-      white-space: pre;
-      font-family: monospace;
-    }
-    #copyButton {
-      margin-top: 20px;
-      padding: 10px 20px;
-      font-size: 16px;
-    }
-    #totalPrice, #categorySummary {
-      font-size: 16px;
-      margin-top: 20px;
-      margin-bottom: 20px;
-    }
-    #totalPrice {
-      font-weight: bold;
-      color: red;
-      font-size: 22px;
-    }
+    body{font-family:monospace;margin:20px;}
+    #header{display:flex;justify-content:space-between;align-items:center;
+            padding-bottom:10px;border-bottom:1px solid #ccc;}
+    #inputs{margin-top:20px;margin-bottom:20px;}
+    .input-group{margin-bottom:5px;}
+    label{width:230px;display:inline-block;}
+    input[type=number]{width:80px;text-align:center;}
+    #categorySummary{white-space:pre;margin-top:15px;}
+    #totalPrice{font-size:22px;font-weight:bold;color:#c00;margin:15px 0;}
+    #output{white-space:pre;margin-top:20px;}
+    #copyButton{margin-top:15px;padding:10px 20px;font-size:16px;}
   </style>
 </head>
 <body>
 
 <div id="header">
-  <h1>キャッシャー集計 ver0.5.5</h1>
-  <span>更新日: 2025/04/27</span>
+  <h1>キャッシャー集計 ver0.5.6</h1>
+  <span>更新日 2025/04/27</span>
 </div>
 
-<input type="file" id="csvFileInput" accept=".csv" />
+<!-- CSV -->
+<input type="file" id="csvFile" accept=".csv">
 
+<!-- 単価入力（固定カテゴリ） -->
 <div id="inputs">
-  <h2>カテゴリごとの料金設定</h2>
-  <div class="input-group"><label>22-1 男性 料金:</label><input type="number" id="price_22m" value="0"></div>
-  <div class="input-group"><label>22-1 女性 料金:</label><input type="number" id="price_22w" value="0"></div>
-  <div class="input-group"><label>ローカル男性 料金:</label><input type="number" id="price_localm" value="0"></div>
-  <div class="input-group"><label>ローカル女性 料金:</label><input type="number" id="price_localw" value="0"></div>
-  <div class="input-group"><label>ローカルG男性 料金:</label><input type="number" id="price_localgm" value="0"></div>
-  <div class="input-group"><label>ローカルG女性 料金:</label><input type="number" id="price_localgw" value="0"></div>
-  <div class="input-group"><label>G男性 料金:</label><input type="number" id="price_gm" value="0"></div>
-  <div class="input-group"><label>G女性 料金:</label><input type="number" id="price_gw" value="0"></div>
-  <div class="input-group"><label>ゲスト男性 料金:</label><input type="number" id="price_guestm" value="0"></div>
-  <div class="input-group"><label>ゲスト女性 料金:</label><input type="number" id="price_guestw" value="0"></div>
-  <div class="input-group"><label>22:00-1:00ゲスト男性 料金:</label><input type="number" id="price_22guestm" value="0"></div>
-  <div class="input-group"><label>22:00-1:00ゲスト女性 料金:</label><input type="number" id="price_22guestw" value="0"></div>
+  <h2>固定カテゴリ単価</h2>
+  <div class="input-group"><label>22-1 男性:</label><input type="number" id="price_22m" value="0"></div>
+  <div class="input-group"><label>22-1 女性:</label><input type="number" id="price_22w" value="0"></div>
+  <div class="input-group"><label>ローカル男性:</label><input type="number" id="price_localm" value="0"></div>
+  <div class="input-group"><label>ローカル女性:</label><input type="number" id="price_localw" value="0"></div>
+  <div class="input-group"><label>ローカルG男性:</label><input type="number" id="price_localgm" value="0"></div>
+  <div class="input-group"><label>ローカルG女性:</label><input type="number" id="price_localgw" value="0"></div>
+  <div class="input-group"><label>G男性:</label><input type="number" id="price_gm" value="0"></div>
+  <div class="input-group"><label>G女性:</label><input type="number" id="price_gw" value="0"></div>
+  <div class="input-group"><label>ゲスト男性:</label><input type="number" id="price_guestm" value="0"></div>
+  <div class="input-group"><label>ゲスト女性:</label><input type="number" id="price_guestw" value="0"></div>
+  <div class="input-group"><label>22:00-1:00ゲスト男性:</label><input type="number" id="price_22guestm" value="0"></div>
+  <div class="input-group"><label>22:00-1:00ゲスト女性:</label><input type="number" id="price_22guestw" value="0"></div>
 </div>
+
+<h2>その他カテゴリー（自動生成）</h2>
+<div id="dynamicInputs"></div>
 
 <div id="categorySummary"></div>
 <div id="totalPrice"></div>
@@ -85,172 +55,143 @@
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 <script>
-let shopData = {};
-let summaryData = {};
-let categoryCount = {};
-let reentryCount = 0;
-
-const categoryKeys = [
-  '22m', '22w', 'localm', 'localw', 'localgm', 'localgw',
-  'gm', 'gw', 'guestm', 'guestw', '22guestm', '22guestw'
-];
-
-const categoryLabels = {
-  '22m': '22-1 男性',
-  '22w': '22-1 女性',
-  'localm': 'ローカル男性',
-  'localw': 'ローカル女性',
-  'localgm': 'ローカルG男性',
-  'localgw': 'ローカルG女性',
-  'gm': 'G男性',
-  'gw': 'G女性',
-  'guestm': 'ゲスト男性',
-  'guestw': 'ゲスト女性',
-  '22guestm': '22:00-1:00ゲスト男性',
-  '22guestw': '22:00-1:00ゲスト女性'
+/* ---------- 固定カテゴリ定義 ---------- */
+const fixedCats = {
+  '22m':'22-1 男性','22w':'22-1 女性',
+  'localm':'ローカル男性','localw':'ローカル女性',
+  'localgm':'ローカルG男性','localgw':'ローカルG女性',
+  'gm':'G男性','gw':'G女性',
+  'guestm':'ゲスト男性','guestw':'ゲスト女性',
+  '22guestm':'22:00-1:00ゲスト男性','22guestw':'22:00-1:00ゲスト女性'
 };
+/* 人数カウント用 */
+let count = {};
+Object.keys(fixedCats).forEach(k=>count[k]=0);
+/* 再入場人数 */
+let reEntry=0;
+/* その他商品の {label:{cnt,priceId}} */
+let others={};
 
-document.getElementById('csvFileInput').addEventListener('change', function(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const text = new TextDecoder('shift-jis').decode(e.target.result);
-    Papa.parse(text, {
-      header: true,
-      skipEmptyLines: true,
-      complete: function(results) {
-        const data = results.data;
-        processCSVData(data);
-        updateDisplay();
-      }
-    });
+/* ---------- CSV読み込み ---------- */
+document.getElementById('csvFile').addEventListener('change',e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const text=new TextDecoder('shift-jis').decode(ev.target.result);
+    Papa.parse(text,{header:true,skipEmptyLines:true,complete:r=>{
+      resetCounts();
+      parseRows(r.data);
+      buildOtherInputs();
+      updateDisplay();
+    }});
   };
   reader.readAsArrayBuffer(file);
 });
 
-function getYesterdayDate() {
-  const today = new Date();
-  today.setDate(today.getDate() - 1);
-  return `${today.getFullYear()}/${today.getMonth() + 1}/${today.getDate()}`;
+/* ---------- 解析 ---------- */
+function resetCounts(){
+  Object.keys(count).forEach(k=>count[k]=0);
+  reEntry=0; others={};
 }
 
-function padRight(str, length) {
-  return (str + ' '.repeat(length)).slice(0, length);
-}
+function parseRows(rows){
+  rows.forEach(row=>{
+    const cat=(row['カテゴリー']||'').trim();
+    let name=(row['商品名']||'').trim().replace(/22~1/g,'22-1');
+    const qty=parseFloat(row['販売商品数'])||0;
+    if(!qty) return;
 
-function padLeft(str, length) {
-  str = String(str);
-  return ' '.repeat(length - str.length) + str;
-}
-
-function processCSVData(data) {
-  categoryCount = {};
-  categoryKeys.forEach(key => categoryCount[key] = 0);
-  reentryCount = 0;
-
-  let door = 0, foreignDoor = 0, doorLate = 0, foreignDoorLate = 0;
-  let total = 0, maleTotal = 0, femaleTotal = 0, foreignTotal = 0;
-  shopData = {};
-
-  let countColumn = Object.keys(data[0]).find(key => key.replace(/\s/g, '').includes('販売商品数'));
-  if (!countColumn) {
-    document.getElementById('output').innerText = 'データが空です';
-    return;
-  }
-
-  data.forEach(row => {
-    let item = row['商品名']?.trim();
-    if (!item) return;
-
-    item = item.replace(/22~1/g, '22-1');
-
-    const count = parseFloat(row[countColumn]) || 0;
-
-    if (item.includes('再入場')) {
-      reentryCount += count;
+    /* その他カテゴリー処理 */
+    if(cat==='その他'){
+      if(name.includes('再入場')){
+        reEntry+=qty;
+      }else{
+        if(!others[name]) others[name]={cnt:0,priceId:createPriceId(name)};
+        others[name].cnt+=qty;
+      }
       return;
     }
 
-    total += count;
-
-    if (item.includes('22-1ゲスト男性') || item.includes('22-1') && item.includes('ゲスト男性')) {
-      categoryCount['22guestm'] += count;
-    } else if (item.includes('22-1ゲスト女性') || item.includes('22-1') && item.includes('ゲスト女性')) {
-      categoryCount['22guestw'] += count;
-    } else if (item.includes('22-1男性')) {
-      categoryCount['22m'] += count;
-    } else if (item.includes('22-1女性')) {
-      categoryCount['22w'] += count;
-    } else if (item.includes('ローカルG男性')) {
-      categoryCount['localgm'] += count;
-    } else if (item.includes('ローカルG女性')) {
-      categoryCount['localgw'] += count;
-    } else if (item.includes('ローカル男性')) {
-      categoryCount['localm'] += count;
-    } else if (item.includes('ローカル女性')) {
-      categoryCount['localw'] += count;
-    } else if (item.includes('G男性')) {
-      categoryCount['gm'] += count;
-    } else if (item.includes('G女性')) {
-      categoryCount['gw'] += count;
-    } else if (item.includes('ゲスト男性')) {
-      categoryCount['guestm'] += count;
-    } else if (item.includes('ゲスト女性')) {
-      categoryCount['guestw'] += count;
-    }
-
-    const shopMatch = item.match(/^(.+?)(ゲスト|フリー)(男性|女性)?$/);
-    if (shopMatch) {
-      const shopName = shopMatch[1].trim();
-      const type = shopMatch[2];
-      shopData[shopName] = shopData[shopName] || { guest: 0, free: 0 };
-      if (type === 'ゲスト') shopData[shopName].guest += count;
-    }
-  });
-
-  summaryData = { total, foreignTotal, maleTotal, femaleTotal, door, foreignDoor, doorLate, foreignDoorLate };
-}
-
-function updateDisplay() {
-  let categoryText = '';
-  let totalPrice = 0;
-
-  categoryKeys.forEach(key => {
-    const price = parseInt(document.getElementById('price_' + key).value) || 0;
-    const people = categoryCount[key];
-    totalPrice += people * price;
-    categoryText += `${categoryLabels[key]} : ${people}人 単価 ${price}円\n`;
-  });
-
-  totalPrice += reentryCount * 500;
-  categoryText += `再入場 : ${reentryCount}人 単価 500円\n`;
-
-  document.getElementById('categorySummary').innerText = categoryText;
-  document.getElementById('totalPrice').innerText = `合計金額: ${totalPrice.toLocaleString()} 円`;
-
-  let html = '';
-  html += 'キャッシャー集計\n\n';
-  html += `${getYesterdayDate()}\n\n`;
-  html += `総数:${Math.round(summaryData.total)}(外国人${Math.round(summaryData.foreignTotal)}人)\n`;
-  html += `M:${Math.round(summaryData.maleTotal)} W:${Math.round(summaryData.femaleTotal)}\n\n`;
-
-  document.getElementById('output').innerText = html;
-}
-
-function copyText() {
-  navigator.clipboard.writeText(document.getElementById('output').innerText).then(() => {
-    alert('コピー完了！');
-  }, () => {
-    alert('コピー失敗...');
+    /* 固定カテゴリマッチング */
+    if(cat.includes('22-1')&&cat.includes('男性')&&!cat.includes('ゲスト')) count['22m']+=qty;
+    else if(cat.includes('22-1')&&cat.includes('女性')&&!cat.includes('ゲスト')) count['22w']+=qty;
+    else if(cat.includes('22-1')&&cat.includes('ゲスト')&&cat.includes('男性')) count['22guestm']+=qty;
+    else if(cat.includes('22-1')&&cat.includes('ゲスト')&&cat.includes('女性')) count['22guestw']+=qty;
+    else if(cat.includes('ローカルG男性')) count['localgm']+=qty;
+    else if(cat.includes('ローカルG女性')) count['localgw']+=qty;
+    else if(cat.includes('ローカル男性')) count['localm']+=qty;
+    else if(cat.includes('ローカル女性')) count['localw']+=qty;
+    else if(cat=== 'G男性') count['gm']+=qty;
+    else if(cat=== 'G女性') count['gw']+=qty;
+    else if(cat=== 'ゲスト男性') count['guestm']+=qty;
+    else if(cat=== 'ゲスト女性') count['guestw']+=qty;
   });
 }
 
-document.querySelectorAll('input[type="number"]').forEach(input => {
-  input.addEventListener('input', updateDisplay);
+function createPriceId(label){
+  return 'price_dyn_'+label.replace(/\s+/g,'_').replace(/[^\w\-]/g,'');
+}
+
+/* ---------- 動的入力生成 ---------- */
+function buildOtherInputs(){
+  const wrap=document.getElementById('dynamicInputs');
+  wrap.innerHTML='';
+  Object.keys(others).forEach(label=>{
+    const id=others[label].priceId;
+    if(document.getElementById(id)) return; // 既に存在
+    const div=document.createElement('div'); div.className='input-group';
+    div.innerHTML=`<label>${label} 料金:</label><input type="number" id="${id}" value="0">`;
+    wrap.appendChild(div);
+    document.getElementById(id).addEventListener('input',updateDisplay);
+  });
+}
+
+/* ---------- 表示＆計算 ---------- */
+function updateDisplay(){
+  /* サマリテキスト */
+  let summary='';
+  let totalPrice=0;
+
+  /* 固定カテゴリ */
+  Object.keys(fixedCats).forEach(k=>{
+    const price=parseInt(document.getElementById('price_'+k).value)||0;
+    summary+=`${fixedCats[k]} : ${count[k]}人 単価 ${price}円\n`;
+    totalPrice+=count[k]*price;
+  });
+
+  /* その他動的カテゴリ */
+  Object.keys(others).forEach(label=>{
+    const id=others[label].priceId;
+    const price=parseInt(document.getElementById(id).value)||0;
+    summary+=`${label} : ${others[label].cnt}人 単価 ${price}円\n`;
+    totalPrice+=others[label].cnt*price;
+  });
+
+  /* 再入場 */
+  summary+=`再入場 : ${reEntry}人 単価 500円\n`;
+  totalPrice+=reEntry*500;
+
+  document.getElementById('categorySummary').innerText=summary;
+  document.getElementById('totalPrice').innerText=`合計金額: ${totalPrice.toLocaleString()} 円`;
+
+  /* 本文（人数など合算は以前のまま簡略表示）*/
+  let body='キャッシャー集計\n\n'+getYesterdayDate()+'\n\n';
+  const totalPeople=Object.values(count).reduce((a,b)=>a+b,0); // 固定カテゴリのみ
+  body+=`合計人数(固定カテゴリ):${totalPeople}\n\n`;
+  document.getElementById('output').innerText=body;
+}
+
+/* ---------- コピー ---------- */
+function copyText(){
+  navigator.clipboard.writeText(document.getElementById('output').innerText)
+    .then(()=>alert('コピー完了！'))
+    .catch(()=>alert('コピー失敗…'));
+}
+
+/* 単価入力が変わったら再計算 */
+document.querySelectorAll('#inputs input[type=number]').forEach(inp=>{
+  inp.addEventListener('input',updateDisplay);
 });
 </script>
-
 </body>
 </html>
