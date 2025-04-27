@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>CSV集計ツール ver0.0.4</title>
+  <title>キャッシャー〆ツール ver0.1.0</title>
   <style>
     #header {
       display: flex;
@@ -20,24 +20,22 @@
       font-size: 14px;
       color: #666;
     }
-    #columns {
-      margin-top: 20px;
-    }
     #output {
       margin-top: 30px;
+      white-space: pre-line;
+      font-family: monospace;
     }
   </style>
 </head>
 <body>
 
 <div id="header">
-  <h1>CSV集計ツール ver0.0.4</h1>
+  <h1>キャッシャー〆ツール ver0.1.0</h1>
   <span>更新日: 2025/04/27</span>
 </div>
 
 <input type="file" id="csvFileInput" accept=".csv" />
 
-<div id="columns"></div>
 <div id="output"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
@@ -48,67 +46,127 @@ document.getElementById('csvFileInput').addEventListener('change', function(even
 
     const reader = new FileReader();
     reader.onload = function(e) {
-        // Shift_JISでデコード
         const text = new TextDecoder('shift-jis').decode(e.target.result);
-        
+
         Papa.parse(text, {
             header: true,
             skipEmptyLines: true,
             complete: function(results) {
                 const data = results.data;
-                showColumns(data);
-                processSimpleSum(data);
+                processData(data);
             }
         });
     };
     reader.readAsArrayBuffer(file);
 });
 
-function showColumns(data) {
-    const keys = Object.keys(data[0] || {});
-    document.getElementById('columns').innerHTML = '<h2>検出された列名一覧:</h2><ul>' + keys.map(key => `<li>${key}</li>`).join('') + '</ul>';
+function getYesterdayDate() {
+    const today = new Date();
+    today.setDate(today.getDate() - 1);
+    const y = today.getFullYear();
+    const m = today.getMonth() + 1;
+    const d = today.getDate();
+    return `${y}/${m}/${d}`;
 }
 
-function processSimpleSum(data) {
+function processData(data) {
     if (!data || data.length === 0) {
-        document.getElementById('output').innerHTML = '<p>データが空です</p>';
+        document.getElementById('output').innerText = 'データが空です';
         return;
     }
 
-    let countColumnName = null;
-    const keys = Object.keys(data[0]);
-    for (const key of keys) {
+    let total = 0;
+    let foreignTotal = 0;
+    let maleTotal = 0;
+    let femaleTotal = 0;
+    let door = 0;
+    let foreignDoor = 0;
+    let doorLate = 0;
+    let foreignDoorLate = 0;
+    let shopGuest = 0;
+    let shopFree = 0;
+    let shops = {};
+
+    // 販売商品数の列名を探す
+    let countColumn = null;
+    for (const key of Object.keys(data[0])) {
         if (key.replace(/\s/g, '').includes('販売商品数')) {
-            countColumnName = key;
+            countColumn = key;
             break;
         }
     }
-    if (!countColumnName) {
-        document.getElementById('output').innerHTML += '<p style="color:red;">販売商品数の列が見つかりません</p>';
+    if (!countColumn) {
+        document.getElementById('output').innerText = '販売商品数の列が見つかりません';
         return;
     }
 
-    let salesSum = 0;
-    let returnSum = 0;
-
     data.forEach(row => {
-        const rawCount = row[countColumnName];
-        const count = parseFloat(rawCount) || 0;
+        const item = row['商品名']?.trim();
+        const count = parseFloat(row[countColumn]) || 0;
+        if (!item) return;
 
-        if (count > 0) {
-            salesSum += count;
-        } else if (count < 0) {
-            returnSum += count;
+        total += count;
+
+        // 分類
+        if (item.includes('G男性') || item.includes('G女性')) {
+            if (item.includes('22-1')) {
+                foreignDoorLate += count;
+            } else if (item.includes('Door')) {
+                foreignDoor += count;
+            } else {
+                foreignTotal += count;
+            }
+        } else if (item.includes('男性') || item.includes('女性')) {
+            if (item.includes('22-1')) {
+                doorLate += count;
+            } else if (item.includes('Door')) {
+                door += count;
+            } else {
+                if (item.includes('男性')) maleTotal += count;
+                if (item.includes('女性')) femaleTotal += count;
+            }
+        }
+
+        // 店ゲスト・フリー
+        if (item.includes('店ゲスト')) {
+            shopGuest += count;
+        }
+        if (item.includes('店Free')) {
+            shopFree += count;
+        }
+
+        // 店舗別
+        const shopMatch = item.match(/^(.+?)(ゲスト|フリー)(男性|女性)?$/);
+        if (shopMatch) {
+            const shopName = shopMatch[1].trim();
+            const type = shopMatch[2];
+            shops[shopName] = shops[shopName] || { guest: 0, free: 0 };
+            if (type === 'ゲスト') {
+                shops[shopName].guest += count;
+            } else if (type === 'フリー') {
+                shops[shopName].free += count;
+            }
         }
     });
 
-    const total = salesSum + returnSum;
+    // 出力作成
+    let output = '';
+    output += 'キャッシャー〆\n\n';
+    output += `${getYesterdayDate()}\n\n`;
+    output += `総数:${Math.round(total)}(外国人${Math.round(foreignTotal)}人)\n`;
+    output += `M:${Math.round(maleTotal)} W:${Math.round(femaleTotal)}\n\n`;
+    output += `Door :${Math.round(door)}\n`;
+    output += `外国人Door:${Math.round(foreignDoor)}\n`;
+    output += `22〜1:00 Door:${Math.round(doorLate)}\n`;
+    output += `22〜1:00 外国人Door:${Math.round(foreignDoorLate)}\n`;
+    output += `店ゲスト :${Math.round(shopGuest)}\n`;
+    output += `店Free :${Math.round(shopFree)}\n\n`;
 
-    let html = '';
-    html += `<h2>総入場数: ${Math.round(total)} 人</h2>`;
-    html += `<p>（販売商品数合計: ${Math.round(salesSum)}，返品商品数合計: ${Math.round(returnSum)}）</p>`;
+    for (const [shop, { guest, free }] of Object.entries(shops)) {
+        output += `${shop}\n　${Math.round(guest + free)}(ゲスト${Math.round(guest)}フリー${Math.round(free)})\n`;
+    }
 
-    document.getElementById('output').innerHTML = html;
+    document.getElementById('output').innerText = output;
 }
 </script>
 
