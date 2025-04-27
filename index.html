@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>CSV集計ツール ver1.1</title>
+  <title>CSV集計ツール ver1.2</title>
   <style>
     #header {
       display: flex;
@@ -25,7 +25,7 @@
 <body>
 
 <div id="header">
-  <h1>CSV集計ツール ver1.1</h1>
+  <h1>CSV集計ツール ver1.2</h1>
   <span>更新日: 2025/04/27</span>
 </div>
 
@@ -69,16 +69,16 @@ function processData(data) {
 
     data.forEach(row => {
         const shop = row['商品名']?.trim();
-        const count = parseInt(row['数量']) || 0;
+        const count = parseFloat(row['販売商品数']) || 0;
 
         if (!shop || isNaN(count)) return;
 
+        totalCount += count; // 販売商品数そのまま加算（マイナスもOK）
+
         if (shop.includes('男性')) {
             maleCount += count;
-            totalCount += count;
         } else if (shop.includes('女性')) {
             femaleCount += count;
-            totalCount += count;
         }
 
         if (shop.includes('G男性') || shop.includes('G女性')) {
@@ -126,18 +126,18 @@ function processData(data) {
 
     let html = '';
 
-    html += `<h2>総数:${totalCount} (外国人${foreignCount}人)</h2>`;
-    html += `<p>M:${maleCount} W:${femaleCount}</p>`;
-    html += `<p>Door:${door}</p>`;
-    html += `<p>外国人Door:${foreignDoor}</p>`;
-    html += `<p>22〜1:00 Door:${doorLate}</p>`;
-    html += `<p>22〜1:00 外国人Door:${foreignDoorLate}</p>`;
-    html += `<p>店ゲスト:${shopGuest}</p>`;
-    html += `<p>店Free:${shopFree}</p>`;
+    html += `<h2>総数:${Math.round(totalCount)} (外国人${Math.round(foreignCount)}人)</h2>`;
+    html += `<p>M:${Math.round(maleCount)} W:${Math.round(femaleCount)}</p>`;
+    html += `<p>Door:${Math.round(door)}</p>`;
+    html += `<p>外国人Door:${Math.round(foreignDoor)}</p>`;
+    html += `<p>22〜1:00 Door:${Math.round(doorLate)}</p>`;
+    html += `<p>22〜1:00 外国人Door:${Math.round(foreignDoorLate)}</p>`;
+    html += `<p>店ゲスト:${Math.round(shopGuest)}</p>`;
+    html += `<p>店Free:${Math.round(shopFree)}</p>`;
 
     for (const [shopName, { guest, free }] of Object.entries(shops)) {
         html += `<h3>${shopName}</h3>`;
-        html += `<p>${guest + free} (ゲスト${guest} フリー${free})</p>`;
+        html += `<p>${Math.round(guest + free)} (ゲスト${Math.round(guest)} フリー${Math.round(free)})</p>`;
     }
 
     document.getElementById('output').innerHTML = html;
