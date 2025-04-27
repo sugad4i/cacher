@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>キャッシャー集計 ver0.5.3</title>
+  <title>キャッシャー集計 ver0.5.4</title>
   <style>
     body {
       font-family: monospace;
@@ -20,7 +20,7 @@
       margin-bottom: 20px;
     }
     .input-group {
-      margin-bottom: 10px;
+      margin-bottom: 5px;
     }
     label {
       width: 200px;
@@ -35,11 +35,10 @@
       white-space: pre;
       font-family: monospace;
     }
-    #copyButton, #generateButton {
+    #copyButton {
       margin-top: 20px;
       padding: 10px 20px;
       font-size: 16px;
-      margin-right: 10px;
     }
     #totalPrice {
       font-size: 22px;
@@ -53,7 +52,7 @@
 <body>
 
 <div id="header">
-  <h1>キャッシャー集計 ver0.5.3</h1>
+  <h1>キャッシャー集計 ver0.5.4</h1>
   <span>更新日: 2025/04/27</span>
 </div>
 
@@ -75,29 +74,36 @@
   <div class="input-group"><label>22:00-1:00ゲスト女性 料金:</label><input type="number" id="price_22guestw" value="0"></div>
 </div>
 
-<button id="generateButton" onclick="generateOutput()">出力</button>
-<button id="copyButton" onclick="copyText()">コピー</button>
-
+<div id="categorySummary"></div>
 <div id="totalPrice"></div>
 <div id="output"></div>
+
+<button id="copyButton" onclick="copyText()">コピー</button>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 <script>
 let shopData = {};
 let summaryData = {};
-let categoryCount = {
-  '22m': 0,
-  '22w': 0,
-  'localm': 0,
-  'localw': 0,
-  'localgm': 0,
-  'localgw': 0,
-  'gm': 0,
-  'gw': 0,
-  'guestm': 0,
-  'guestw': 0,
-  '22guestm': 0,
-  '22guestw': 0
+let categoryCount = {};
+
+const categoryKeys = [
+  '22m', '22w', 'localm', 'localw', 'localgm', 'localgw',
+  'gm', 'gw', 'guestm', 'guestw', '22guestm', '22guestw'
+];
+
+const categoryLabels = {
+  '22m': '22-1 男性',
+  '22w': '22-1 女性',
+  'localm': 'ローカル男性',
+  'localw': 'ローカル女性',
+  'localgm': 'ローカルG男性',
+  'localgw': 'ローカルG女性',
+  'gm': 'G男性',
+  'gw': 'G女性',
+  'guestm': 'ゲスト男性',
+  'guestw': 'ゲスト女性',
+  '22guestm': '22:00-1:00ゲスト男性',
+  '22guestw': '22:00-1:00ゲスト女性'
 };
 
 document.getElementById('csvFileInput').addEventListener('change', function(event) {
@@ -113,6 +119,7 @@ document.getElementById('csvFileInput').addEventListener('change', function(even
       complete: function(results) {
         const data = results.data;
         processCSVData(data);
+        updateDisplay();
       }
     });
   };
@@ -135,7 +142,8 @@ function padLeft(str, length) {
 }
 
 function processCSVData(data) {
-  Object.keys(categoryCount).forEach(key => categoryCount[key] = 0);
+  categoryCount = {};
+  categoryKeys.forEach(key => categoryCount[key] = 0);
 
   let door = 0, foreignDoor = 0, doorLate = 0, foreignDoorLate = 0;
   let total = 0, maleTotal = 0, femaleTotal = 0, foreignTotal = 0;
@@ -143,7 +151,7 @@ function processCSVData(data) {
 
   let countColumn = Object.keys(data[0]).find(key => key.replace(/\s/g, '').includes('販売商品数'));
   if (!countColumn) {
-    document.getElementById('output').innerText = '販売商品数の列が見つかりません';
+    document.getElementById('output').innerText = 'データが空です';
     return;
   }
 
@@ -156,18 +164,6 @@ function processCSVData(data) {
     const normalizedItem = itemFixed.replace(/^22-1\s*/, '');
 
     total += count;
-
-    if (itemFixed.includes('G男性') || itemFixed.includes('G女性')) foreignTotal += count;
-    if (itemFixed.includes('男性')) maleTotal += count;
-    if (itemFixed.includes('女性')) femaleTotal += count;
-
-    if (itemFixed.includes('G男性') || itemFixed.includes('G女性')) {
-      if (itemFixed.includes('22-1')) foreignDoorLate += count;
-      else foreignDoor += count;
-    } else if (itemFixed.includes('男性') || itemFixed.includes('ローカルG男性') || itemFixed.includes('女性') || itemFixed.includes('ローカルG女性')) {
-      if (itemFixed.includes('22-1')) doorLate += count;
-      else door += count;
-    }
 
     if (itemFixed.includes('22-1ゲスト男性')) categoryCount['22guestm'] += count;
     else if (itemFixed.includes('22-1ゲスト女性')) categoryCount['22guestw'] += count;
@@ -194,26 +190,18 @@ function processCSVData(data) {
   summaryData = { total, foreignTotal, maleTotal, femaleTotal, door, foreignDoor, doorLate, foreignDoorLate };
 }
 
-function generateOutput() {
-  const prices = {
-    '22m': parseInt(document.getElementById('price_22m').value) || 0,
-    '22w': parseInt(document.getElementById('price_22w').value) || 0,
-    'localm': parseInt(document.getElementById('price_localm').value) || 0,
-    'localw': parseInt(document.getElementById('price_localw').value) || 0,
-    'localgm': parseInt(document.getElementById('price_localgm').value) || 0,
-    'localgw': parseInt(document.getElementById('price_localgw').value) || 0,
-    'gm': parseInt(document.getElementById('price_gm').value) || 0,
-    'gw': parseInt(document.getElementById('price_gw').value) || 0,
-    'guestm': parseInt(document.getElementById('price_guestm').value) || 0,
-    'guestw': parseInt(document.getElementById('price_guestw').value) || 0,
-    '22guestm': parseInt(document.getElementById('price_22guestm').value) || 0,
-    '22guestw': parseInt(document.getElementById('price_22guestw').value) || 0,
-  };
+function updateDisplay() {
+  let categoryText = '';
+  let totalPrice = 0;
 
-  let totalPrice = Object.keys(categoryCount).reduce((sum, key) => {
-    return sum + (categoryCount[key] * prices[key]);
-  }, 0);
+  categoryKeys.forEach(key => {
+    const price = parseInt(document.getElementById('price_' + key).value) || 0;
+    const people = categoryCount[key];
+    totalPrice += people * price;
+    categoryText += `${categoryLabels[key]} : ${people}人 単価 ${price}円\n`;
+  });
 
+  document.getElementById('categorySummary').innerText = categoryText;
   document.getElementById('totalPrice').innerText = `合計金額: ${totalPrice.toLocaleString()} 円`;
 
   let html = '';
@@ -221,14 +209,6 @@ function generateOutput() {
   html += `${getYesterdayDate()}\n\n`;
   html += `総数:${Math.round(summaryData.total)}(外国人${Math.round(summaryData.foreignTotal)}人)\n`;
   html += `M:${Math.round(summaryData.maleTotal)} W:${Math.round(summaryData.femaleTotal)}\n\n`;
-  html += `${padRight('Door', 20)}: ${padLeft(Math.round(summaryData.door), 4)}\n`;
-  html += `${padRight('外国人Door', 20)}: ${padLeft(Math.round(summaryData.foreignDoor), 4)}\n`;
-  html += `${padRight('22:00-1:00 Door', 20)}: ${padLeft(Math.round(summaryData.doorLate), 4)}\n`;
-  html += `${padRight('22:00-1:00 外国人Door', 20)}: ${padLeft(Math.round(summaryData.foreignDoorLate), 4)}\n\n`;
-
-  for (const [shop, { guest }] of Object.entries(shopData)) {
-    html += `${shop}\n　${padLeft(guest, 3)}（ゲスト${padLeft(guest, 3)} フリー[0]）\n\n`;
-  }
 
   document.getElementById('output').innerText = html;
 }
@@ -240,6 +220,10 @@ function copyText() {
     alert('コピー失敗...');
   });
 }
+
+document.querySelectorAll('input[type="number"]').forEach(input => {
+  input.addEventListener('input', updateDisplay);
+});
 </script>
 
 </body>
