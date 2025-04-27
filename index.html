@@ -1,8 +1,8 @@
-<index html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>集計サイト</title>
+  <title>CSV集計ツール</title>
 </head>
 <body>
 
@@ -28,6 +28,11 @@ document.getElementById('csvFileInput').addEventListener('change', function(even
 });
 
 function processData(data) {
+    if (!data || data.length === 0) {
+        document.getElementById('output').innerHTML = '<p>データが空です</p>';
+        return;
+    }
+
     let totalCount = 0;
     let foreignCount = 0;
     let maleCount = 0;
@@ -42,7 +47,7 @@ function processData(data) {
 
     data.forEach(row => {
         const shop = row['商品名']?.trim();
-        const count = parseInt(row['売上数']) || 0;
+        const count = parseInt(row['数量']) || 0;
 
         if (!shop || isNaN(count)) return;
 
