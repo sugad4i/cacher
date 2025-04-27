@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>キャッシャー集計 ver0.6.1</title>
+<title>キャッシャー集計 ver0.6.3</title>
 <style>
  body{font-family:monospace;margin:20px}
  #header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ccc;padding-bottom:8px}
@@ -11,14 +11,14 @@
  th{background:#eee}
  input[type=number]{width:80px;text-align:right}
  #total{font-size:22px;font-weight:bold;color:#c00;margin:18px 0}
- #output{white-space:pre;margin-top:18px}
+ #output,#bigText{white-space:pre;margin-top:18px}
  #copyBtn{padding:8px 20px;font-size:16px}
 </style>
 </head>
 <body>
 
 <div id="header">
-  <h1>キャッシャー集計 ver0.6.1</h1><span id="upd"></span>
+  <h1>キャッシャー集計 ver0.6.3</h1><span id="upd"></span>
 </div>
 
 <input type="file" id="csv" accept=".csv">
@@ -26,137 +26,127 @@
 <table id="tbl"><thead><tr><th>カテゴリー / 商品名</th><th>人数</th><th>単価 (円)</th></tr></thead><tbody></tbody></table>
 
 <div id="total"></div>
-<div id="output"></div>
+
+<h3>コピー用テキスト</h3>
+<div id="bigText"></div>
 <button id="copyBtn" onclick="copyTxt()">コピー</button>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 <script>
-/* 表示優先度（上から順に並ぶ） */
-const priority=[
-  /* 22-1 */
-  '22-1 男性','22-1 女性','22-1 G男性ゲスト','22-1 G女性ゲスト',
-  '22-1 男性ゲスト','22-1 女性ゲスト','22-1 ゲスト男性','22-1 ゲスト女性',
-  '22-1',               // 22-1 が含まれる残り全部
-
-  /* ローカル通常 */
-  'ローカル男性','ローカル女性','ローカルG男性','ローカルG女性',
-
-  /* Ｇ通常 */
-  'G男性','G女性',
-
-  /* ローカルゲスト */
-  'ローカルゲスト男性','ローカルゲスト女性',
-  'ローカルGゲスト男性','ローカルGゲスト女性',
-
-  /* Ｇゲスト */
-  'Gゲスト男性','Gゲスト女性',
-
-  /* フリー（固定0円） */
-  'フリー'
-];
-/* 集計用 */
-let catMap={}, others={}, reEntry=0;
 const tbody=document.querySelector('#tbl tbody');
 document.getElementById('upd').textContent='更新 '+new Date().toLocaleDateString();
 
-/* CSV読み込み */
+/* 並び順 */
+const priority=[
+  '22-1','ローカル','G','ゲスト','フリー'
+];
+const subOrder=[
+ '22-1','22-1 ゲスト',
+ 'ローカル','ローカルG',
+ 'G','Gゲスト','ゲスト'
+];
+
+/* 集計マップ */
+let rows=[],reEntry=0;
+
+/* CSV */
 document.getElementById('csv').addEventListener('change',e=>{
-  const f=e.target.files[0]; if(!f) return;
-  new Response(f).arrayBuffer().then(buf=>{
-    const txt=new TextDecoder('shift-jis').decode(buf);
-    Papa.parse(txt,{header:true,skipEmptyLines:true,complete:r=>{
-      aggregate(r.data);
-      buildRows();
-      calc();
-    }});
-  });
+ const file=e.target.files[0];if(!file)return;
+ new Response(file).arrayBuffer().then(buf=>{
+  const txt=new TextDecoder('shift-jis').decode(buf);
+  Papa.parse(txt,{header:true,skipEmptyLines:true,complete:r=>{
+    parseCSV(r.data);
+    buildTable();
+    recalc();
+  }});
+ });
 });
 
-/* --- 集計 --- */
-function aggregate(rows){
-  catMap={}; others={}; reEntry=0;
-  const cntCol=rows[0]&&Object.keys(rows[0]).find(k=>k.replace(/\s/g,'').includes('販売商品数'));
-  rows.forEach(row=>{
-    const cat=(row['カテゴリー']||'').trim();
-    let name=(row['商品名']||'').trim().replace(/22~1/g,'22-1');
-    const n=+row[cntCol]||0; if(!n) return;
+/* 解析 */
+function parseCSV(data){
+  rows=[];reEntry=0;
+  const cntCol=data[0]&&Object.keys(data[0]).find(k=>k.replace(/\s/g,'').includes('販売商品数'));
+  const map=new Map();
+  data.forEach(r=>{
+    const cat=(r['カテゴリー']||'').trim();
+    let name=(r['商品名']||'').trim().replace(/22~1/g,'22-1');
+    const n=+r[cntCol]||0;if(!n)return;
 
     if(cat==='その他'){
       if(name.includes('再入場')){reEntry+=n;}
-      else{ if(!others[name]) others[name]=0; others[name]+=n; }
+      else{
+        if(!map.has(name))map.set(name,{label:name,cnt:0,price:0});
+        map.get(name).cnt+=n;
+      }
     }else{
-      if(!catMap[cat]) catMap[cat]=0;
-      catMap[cat]+=n;
+      if(!map.has(cat))map.set(cat,{label:cat,cnt:0,price:0});
+      map.get(cat).cnt+=n;
     }
   });
+  rows=[...map.values()];
 }
 
-/* --- 並び順ユーティリティ --- */
-function orderIdx(label){
-  const i=priority.findIndex(p=>label.startsWith(p));
-  return i>=0? i: 900;          // 未登録は最後尾手前
-}
-function byLabelJa(a,b){return a.localeCompare(b,'ja');}
-
-/* --- 行要素 --- */
-function makeRow(label,cnt,id,init=0,lock=false){
-  if(label==='フリー'){init=0; lock=true;}       // フリーは0円固定
-  if(label==='再入場'){init=500; lock=true;}     // 再入場500円固定
-  const tr=document.createElement('tr');
-  tr.innerHTML=
-    `<td>${label}</td><td>${cnt}</td>`+
-    `<td>${lock ? init : `<input type="number" id="${id}" value="${init}">`}</td>`;
-  return tr;
-}
-function idOf(label){return 'p_'+btoa(unescape(encodeURIComponent(label))).replace(/=+$/,'');}
-
-/* --- 表構築 --- */
-function buildRows(){
-  tbody.innerHTML='';
-
-  const all=[];
-  Object.entries(catMap).forEach(([lab,cnt])=>all.push({lab,cnt,priceId:idOf(lab)}));
-  Object.entries(others ).forEach(([lab,cnt])=>all.push({lab,cnt,priceId:idOf(lab)}));
-
-  /* 22-1, ローカル… 優先順→五十音 */
-  const sorted=all.sort((a,b)=>orderIdx(a.lab)-orderIdx(b.lab)||byLabelJa(a.lab,b.lab));
-  sorted.forEach(r=>tbody.appendChild(makeRow(r.lab,r.cnt,r.priceId)));
-
-  /* フリー行が無ければ人数0で追加 */
-  if(!sorted.some(r=>r.lab==='フリー')) tbody.appendChild(makeRow('フリー',0,null,0,true));
-
-  /* 再入場最後 */
-  tbody.appendChild(makeRow('再入場',reEntry));
-
-  /* 入力イベント */
-  tbody.querySelectorAll('input[type=number]').forEach(inp=>inp.oninput=calc);
+/* 並び順 */
+function orderKey(l){
+  /* 22-1 非ゲスト → 22-1 ゲスト */
+  if(l.startsWith('22-1')&&!l.includes('ゲスト'))return '0';
+  if(l.startsWith('22-1')&& l.includes('ゲスト'))return '1';
+  /* ローカル通常／G通常／ローカルゲスト／Gゲスト */
+  for(let i=0;i<subOrder.length;i++){
+    if(l.startsWith(subOrder[i]))return String(2+i).padStart(2,'0');
+  }
+  if(l==='フリー')return '98';
+  return '99';
 }
 
-/* --- 金額計算 --- */
-function calc(){
-  let sum=0,totalPeople=0;
-  tbody.querySelectorAll('tr').forEach(tr=>{
-    const label=tr.cells[0].textContent.trim();
-    const num=+tr.cells[1].textContent;
-    totalPeople+= label==='再入場'?0:num;   // 再入場は本文人数に入れない
-    let price=0;
-    const inp=tr.querySelector('input'); if(inp) price=+inp.value||0;
-    else if(label==='再入場') price=500;    // 固定
-    else if(label==='フリー') price=0;
-    sum+=num*price;
-  });
-  document.getElementById('total').textContent=`合計金額: ${sum.toLocaleString()} 円`;
-
-  /* コピー用本文 */
-  document.getElementById('output').textContent=
-    `キャッシャー集計\n\n${yesterday()}\n\n総人数:${totalPeople}`;
+/* テーブル構築 */
+function buildTable(){
+ tbody.innerHTML='';
+ rows.sort((a,b)=>orderKey(a.label).localeCompare(orderKey(b.label),'ja')||
+                        a.label.localeCompare(b.label,'ja'));
+ /* フリー行追加保証 */
+ if(!rows.some(r=>r.label==='フリー'))rows.push({label:'フリー',cnt:0,price:0});
+ rows.forEach(r=>{
+   const id='p_'+btoa(unescape(encodeURIComponent(r.label))).replace(/=+$/,'');
+   const tr=document.createElement('tr');
+   const lock=r.label==='フリー';
+   tr.innerHTML=
+     `<td>${r.label}</td><td>${r.cnt}</td>`+
+     `<td>${lock?0:`<input type="number" id="${id}" value="${r.price}">`}</td>`;
+   tbody.appendChild(tr);
+   if(!lock)document.getElementById(id).oninput=recalc;
+ });
+ /* 再入場 */
+ const tr=document.createElement('tr');
+ tr.innerHTML=`<td>再入場</td><td>${reEntry}</td><td>500</td>`;
+ tbody.appendChild(tr);
 }
 
-/* --- クリップボード --- */
+/* 再計算 */
+function recalc(){
+ let sum=0,totalPeople=0;
+ tbody.querySelectorAll('tr').forEach(tr=>{
+   const label=tr.cells[0].textContent.trim();
+   const num =+tr.cells[1].textContent;
+   let price=0;
+   const inp=tr.querySelector('input');
+   if(inp)price=+inp.value||0;
+   else if(label==='再入場')price=500;
+   else if(label==='フリー')price=0;
+   sum+=num*price;
+   if(label!=='再入場')totalPeople+=num;
+ });
+ document.getElementById('total').textContent=`合計金額: ${sum.toLocaleString()} 円`;
+
+ /* 大量テキスト（旧ver0.4 風） */
+ document.getElementById('bigText').textContent=
+   `キャッシャー集計\n\n${yesterday()}\n\n総人数:${totalPeople}\n合計金額:${sum.toLocaleString()}円`;
+}
+
+/* コピー */
 function copyTxt(){
-  navigator.clipboard.writeText(document.getElementById('output').textContent)
-    .then(()=>alert('コピー完了！'))
-    .catch(()=>alert('コピー失敗…'));
+  navigator.clipboard.writeText(document.getElementById('bigText').textContent)
+    .then(()=>alert('コピー完了！')).catch(()=>alert('コピー失敗…'));
 }
 function yesterday(){const d=new Date();d.setDate(d.getDate()-1);return`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`}
 </script>
