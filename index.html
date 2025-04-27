@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>キャッシャー集計 ver0.5.0</title>
+  <title>キャッシャー集計 ver0.5.1</title>
   <style>
     body {
       font-family: monospace;
@@ -23,7 +23,7 @@
       margin-bottom: 10px;
     }
     label {
-      width: 150px;
+      width: 180px;
       display: inline-block;
     }
     input[type="number"] {
@@ -35,10 +35,11 @@
       white-space: pre;
       font-family: monospace;
     }
-    #copyButton {
+    #copyButton, #generateButton {
       margin-top: 20px;
       padding: 10px 20px;
       font-size: 16px;
+      margin-right: 10px;
     }
     #totalPrice {
       font-size: 20px;
@@ -51,7 +52,7 @@
 <body>
 
 <div id="header">
-  <h1>キャッシャー集計 ver0.5.0</h1>
+  <h1>キャッシャー集計 ver0.5.1</h1>
   <span>更新日: 2025/04/27</span>
 </div>
 
@@ -69,14 +70,17 @@
   <div class="input-group"><label>G女性:</label><input type="number" id="i_gw" value="0"></div>
   <div class="input-group"><label>ゲスト男性:</label><input type="number" id="i_guestm" value="0"></div>
   <div class="input-group"><label>ゲスト女性:</label><input type="number" id="i_guestw" value="0"></div>
+  <div class="input-group"><label>22:00-1:00ゲスト男性:</label><input type="number" id="i_22guestm" value="0"></div>
+  <div class="input-group"><label>22:00-1:00ゲスト女性:</label><input type="number" id="i_22guestw" value="0"></div>
   <div class="input-group"><label>1人あたり料金 (円):</label><input type="number" id="i_price" value="0"></div>
 </div>
+
+<button id="generateButton" onclick="generateOutput()">出力</button>
+<button id="copyButton" onclick="copyText()">コピー</button>
 
 <div id="totalPrice"></div>
 
 <div id="output"></div>
-
-<button id="copyButton" onclick="copyText()">コピー</button>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 <script>
@@ -95,7 +99,7 @@ document.getElementById('csvFileInput').addEventListener('change', function(even
       skipEmptyLines: true,
       complete: function(results) {
         const data = results.data;
-        processData(data);
+        processCSVData(data);
       }
     });
   };
@@ -117,7 +121,7 @@ function padLeft(str, length) {
   return ' '.repeat(length - str.length) + str;
 }
 
-function processData(data) {
+function processCSVData(data) {
   if (!data || data.length === 0) {
     document.getElementById('output').innerText = 'データが空です';
     return;
@@ -165,17 +169,14 @@ function processData(data) {
   });
 
   summaryData = { total, foreignTotal, maleTotal, femaleTotal, door, foreignDoor, doorLate, foreignDoorLate };
-
-  generateOutput();
 }
 
 function generateOutput() {
-  const inputs = [
-    'i_22m', 'i_22w', 'i_localm', 'i_localw',
-    'i_localgm', 'i_localgw', 'i_gm', 'i_gw',
-    'i_guestm', 'i_guestw'
+  const ids = [
+    'i_22m', 'i_22w', 'i_localm', 'i_localw', 'i_localgm', 'i_localgw',
+    'i_gm', 'i_gw', 'i_guestm', 'i_guestw', 'i_22guestm', 'i_22guestw'
   ];
-  let totalPeople = inputs.reduce((sum, id) => sum + (parseInt(document.getElementById(id).value) || 0), 0);
+  let totalPeople = ids.reduce((sum, id) => sum + (parseInt(document.getElementById(id).value) || 0), 0);
   let price = parseInt(document.getElementById('i_price').value) || 0;
   let totalPrice = totalPeople * price;
 
@@ -193,7 +194,7 @@ function generateOutput() {
 
   for (const [shop, { guest }] of Object.entries(shopData)) {
     const id = shop.replace(/\s+/g, '_');
-    html += `${shop}\n　${padLeft(guest, 3)}（ゲスト${padLeft(guest, 3)} フリー[${document.getElementById(`free_${id}`)?.value || 0}]）\n\n`;
+    html += `${shop}\n　${padLeft(guest, 3)}（ゲスト${padLeft(guest, 3)} フリー[0]）\n\n`;
   }
 
   document.getElementById('output').innerText = html;
