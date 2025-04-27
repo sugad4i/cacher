@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>CSV集計ツール ver0.0.3-debug</title>
+  <title>CSV集計ツール ver0.0.4</title>
   <style>
     #header {
       display: flex;
@@ -31,7 +31,7 @@
 <body>
 
 <div id="header">
-  <h1>CSV集計ツール ver0.0.3-debug</h1>
+  <h1>CSV集計ツール ver0.0.4</h1>
   <span>更新日: 2025/04/27</span>
 </div>
 
@@ -46,30 +46,37 @@ document.getElementById('csvFileInput').addEventListener('change', function(even
     const file = event.target.files[0];
     if (!file) return;
 
-    Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: function(results) {
-            const data = results.data;
-            
-            // 検出した列名一覧を表示
-            const keys = Object.keys(data[0] || {});
-            document.getElementById('columns').innerHTML = '<h2>検出された列名一覧:</h2><ul>' + keys.map(key => `<li>${key}</li>`).join('') + '</ul>';
-
-            // 通常処理
-            processSimpleSum(data, keys);
-        }
-    });
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        // Shift_JISでデコード
+        const text = new TextDecoder('shift-jis').decode(e.target.result);
+        
+        Papa.parse(text, {
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                const data = results.data;
+                showColumns(data);
+                processSimpleSum(data);
+            }
+        });
+    };
+    reader.readAsArrayBuffer(file);
 });
 
-function processSimpleSum(data, keys) {
+function showColumns(data) {
+    const keys = Object.keys(data[0] || {});
+    document.getElementById('columns').innerHTML = '<h2>検出された列名一覧:</h2><ul>' + keys.map(key => `<li>${key}</li>`).join('') + '</ul>';
+}
+
+function processSimpleSum(data) {
     if (!data || data.length === 0) {
         document.getElementById('output').innerHTML = '<p>データが空です</p>';
         return;
     }
 
-    // 販売商品数の列名を探す（スペースを除去して判定）
     let countColumnName = null;
+    const keys = Object.keys(data[0]);
     for (const key of keys) {
         if (key.replace(/\s/g, '').includes('販売商品数')) {
             countColumnName = key;
@@ -91,7 +98,7 @@ function processSimpleSum(data, keys) {
         if (count > 0) {
             salesSum += count;
         } else if (count < 0) {
-            returnSum += count; // マイナスだからそのまま加算
+            returnSum += count;
         }
     });
 
