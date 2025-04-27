@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>キャッシャー〆ツール ver0.1.0</title>
+  <title>キャッシャー〆ツール ver0.1.1</title>
   <style>
     #header {
       display: flex;
@@ -30,7 +30,7 @@
 <body>
 
 <div id="header">
-  <h1>キャッシャー〆ツール ver0.1.0</h1>
+  <h1>キャッシャー〆ツール ver0.1.1</h1>
   <span>更新日: 2025/04/27</span>
 </div>
 
@@ -101,42 +101,47 @@ function processData(data) {
     }
 
     data.forEach(row => {
-        const item = row['商品名']?.trim();
+        const originalItem = row['商品名']?.trim();
+        if (!originalItem) return;
         const count = parseFloat(row[countColumn]) || 0;
-        if (!item) return;
-
         total += count;
 
-        // 分類
-        if (item.includes('G男性') || item.includes('G女性')) {
-            if (item.includes('22-1')) {
+        // --- 22~1 → 22-1 に修正 ---
+        const itemFixed = originalItem.replace(/22~1/g, '22-1');
+
+        // --- 店舗判定用：22-1を消したバージョン ---
+        const normalizedItem = itemFixed.replace(/^22-1\s*/, '');
+
+        // 外国人・Door・22-1関連分類
+        if (itemFixed.includes('G男性') || itemFixed.includes('G女性')) {
+            if (itemFixed.includes('22-1')) {
                 foreignDoorLate += count;
-            } else if (item.includes('Door')) {
+            } else if (itemFixed.includes('Door')) {
                 foreignDoor += count;
             } else {
                 foreignTotal += count;
             }
-        } else if (item.includes('男性') || item.includes('女性')) {
-            if (item.includes('22-1')) {
+        } else if (itemFixed.includes('男性') || itemFixed.includes('女性')) {
+            if (itemFixed.includes('22-1')) {
                 doorLate += count;
-            } else if (item.includes('Door')) {
+            } else if (itemFixed.includes('Door')) {
                 door += count;
             } else {
-                if (item.includes('男性')) maleTotal += count;
-                if (item.includes('女性')) femaleTotal += count;
+                if (itemFixed.includes('男性')) maleTotal += count;
+                if (itemFixed.includes('女性')) femaleTotal += count;
             }
         }
 
         // 店ゲスト・フリー
-        if (item.includes('店ゲスト')) {
+        if (itemFixed.includes('店ゲスト')) {
             shopGuest += count;
         }
-        if (item.includes('店Free')) {
+        if (itemFixed.includes('店Free')) {
             shopFree += count;
         }
 
-        // 店舗別
-        const shopMatch = item.match(/^(.+?)(ゲスト|フリー)(男性|女性)?$/);
+        // 店舗別ゲスト・フリー
+        const shopMatch = normalizedItem.match(/^(.+?)(ゲスト|フリー)(男性|女性)?$/);
         if (shopMatch) {
             const shopName = shopMatch[1].trim();
             const type = shopMatch[2];
