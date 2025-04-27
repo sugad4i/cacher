@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>CSV集計ツール ver0.0.3</title>
+  <title>CSV集計ツール ver0.0.3-debug</title>
   <style>
     #header {
       display: flex;
@@ -20,17 +20,24 @@
       font-size: 14px;
       color: #666;
     }
+    #columns {
+      margin-top: 20px;
+    }
+    #output {
+      margin-top: 30px;
+    }
   </style>
 </head>
 <body>
 
 <div id="header">
-  <h1>CSV集計ツール ver0.0.3</h1>
+  <h1>CSV集計ツール ver0.0.3-debug</h1>
   <span>更新日: 2025/04/27</span>
 </div>
 
 <input type="file" id="csvFileInput" accept=".csv" />
 
+<div id="columns"></div>
 <div id="output"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
@@ -44,20 +51,25 @@ document.getElementById('csvFileInput').addEventListener('change', function(even
         skipEmptyLines: true,
         complete: function(results) {
             const data = results.data;
-            processSimpleSum(data);
+            
+            // 検出した列名一覧を表示
+            const keys = Object.keys(data[0] || {});
+            document.getElementById('columns').innerHTML = '<h2>検出された列名一覧:</h2><ul>' + keys.map(key => `<li>${key}</li>`).join('') + '</ul>';
+
+            // 通常処理
+            processSimpleSum(data, keys);
         }
     });
 });
 
-function processSimpleSum(data) {
+function processSimpleSum(data, keys) {
     if (!data || data.length === 0) {
         document.getElementById('output').innerHTML = '<p>データが空です</p>';
         return;
     }
 
-    // 販売商品数の列名を探す（スペースずれ対策）
+    // 販売商品数の列名を探す（スペースを除去して判定）
     let countColumnName = null;
-    const keys = Object.keys(data[0]);
     for (const key of keys) {
         if (key.replace(/\s/g, '').includes('販売商品数')) {
             countColumnName = key;
@@ -65,7 +77,7 @@ function processSimpleSum(data) {
         }
     }
     if (!countColumnName) {
-        document.getElementById('output').innerHTML = '<p>販売商品数の列が見つかりません</p>';
+        document.getElementById('output').innerHTML += '<p style="color:red;">販売商品数の列が見つかりません</p>';
         return;
     }
 
@@ -79,7 +91,7 @@ function processSimpleSum(data) {
         if (count > 0) {
             salesSum += count;
         } else if (count < 0) {
-            returnSum += count; // マイナスだから加算（引き算と同じ意味）
+            returnSum += count; // マイナスだからそのまま加算
         }
     });
 
