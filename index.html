@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>料金計算ツール ver0.1</title>
+<title>料金計算ツール ver0.2</title>
 <style>
  body{font-family:monospace;margin:20px}
  #head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ccc;padding-bottom:8px}
@@ -15,7 +15,7 @@
 </head>
 <body>
 
-<div id="head"><h1>料金計算ツール ver0.1</h1><span id="upd"></span></div>
+<div id="head"><h1>料金計算ツール ver0.2</h1><span id="upd"></span></div>
 
 <input type="file" id="csv" accept=".csv">
 
@@ -27,86 +27,101 @@
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 <script>
+/* ---- 並び順定義 ---- */
+const order22 = [
+  '22-1 男性','22-1 女性','22-1 G男性','22-1 G女性',
+  '22-1 男性ゲスト','22-1 女性ゲスト','22-1 G男性ゲスト','22-1 G女性ゲスト'
+];
+const orderNorm = [
+  '男性','女性','ローカルG男性','ローカルG女性',
+  'G男性','G女性',
+  '男性ゲスト','女性ゲスト',
+  'ローカルG男性ゲスト','ローカルG女性ゲスト',
+  'G男性ゲスト','G女性ゲスト'
+];
+
+/* ---- 並びキー ---- */
+function sortKey(label){
+  if(label.startsWith('22-1')){
+    const i = order22.findIndex(t=>label.startsWith(t));
+    return '0'+(i>=0?String(i).padStart(2,'0'):'98');
+  }
+  if(label.includes('フリー')) return '3'+label;            // 最下段
+  const j = orderNorm.findIndex(t=>label.startsWith(t));
+  return '1'+(j>=0?String(j).padStart(2,'0'):'99')+label;  // 通常ブロック
+}
+
+/* ---- util ---- */
 const tbody=document.querySelector('#tbl tbody');
 document.getElementById('upd').textContent='更新 '+new Date().toLocaleDateString();
-
-/* 並び順判定 */
-function key(label){
- if(label.includes('22-1')) return '0'+label;
- if(label.includes('フリー')) return '2'+label;
- if(label==='その他') return '1Z';             // 実際は展開済みで来ない
- return '1'+label;                             // 通常
-}
-
-/* CSV 読み込み */
-document.getElementById('csv').addEventListener('change',e=>{
- const f=e.target.files[0]; if(!f) return;
- new Response(f).arrayBuffer().then(buf=>{
-  const txt=new TextDecoder('shift-jis').decode(buf);
-  Papa.parse(txt,{header:true,skipEmptyLines:true,complete:r=>{
-     makeTable(summarize(r.data));
-     calc();
-  }});
- });
-});
-
-/* 集計：{label, cnt, priceId}[] 生成 */
-function summarize(rows){
- const cntCol=rows[0]&&Object.keys(rows[0]).find(k=>k.replace(/\s/g,'').includes('販売商品数'));
- const map=new Map(), etc=new Map();
-
- rows.forEach(row=>{
-   const cat=(row['カテゴリー']||'').trim();
-   const name=(row['商品名']||'').trim().replace(/22~1/g,'22-1');
-   const n=+row[cntCol]||0; if(!n) return;
-
-   if(cat==='その他'){                       // その他 → 商品名ごと
-     etc.set(name,(etc.get(name)||0)+n);
-   }else{
-     map.set(cat,(map.get(cat)||0)+n);
-   }
- });
-
- /* map → 配列へ */
- const list=[...map.entries()].map(([label,cnt])=>({label,cnt,priceId:id(label)}));
- /* etc（その他）を append */
- [...etc.entries()].forEach(([label,cnt])=>list.push({label,cnt,priceId:id(label)}));
- /* フリー補完 */
- if(!list.find(o=>o.label.includes('フリー')))
-     list.push({label:'フリー',cnt:0,priceId:null});
-
- /* ソート */
- return list.sort((a,b)=>key(a.label).localeCompare(key(b.label),'ja'));
-}
 function id(label){return 'p_'+btoa(unescape(encodeURIComponent(label))).replace(/=+$/,'');}
 
-/* 表生成 */
-function makeTable(arr){
- tbody.innerHTML='';
- arr.forEach(o=>{
-   const lock=o.label.includes('フリー');
-   const tr=document.createElement('tr');
-   tr.innerHTML=
-     `<td>${o.label}</td><td>${o.cnt}</td>`+
-     `<td>${lock?0:`<input type="number" id="${o.priceId}" value="0">`}</td>`;
-   tbody.appendChild(tr);
-   if(!lock) document.getElementById(o.priceId).oninput=calc;
- });
+/* ---- CSV 読み込み ---- */
+document.getElementById('csv').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f) return;
+  new Response(f).arrayBuffer().then(buf=>{
+    const text=new TextDecoder('shift-jis').decode(buf);
+    Papa.parse(text,{header:true,skipEmptyLines:true,complete:r=>{
+       makeTable( summarize(r.data) );
+       calc();
+    }});
+  });
+});
+
+/* ---- 集計 to list ---- */
+function summarize(rows){
+  const cntCol=rows[0]&&Object.keys(rows[0]).find(k=>k.replace(/\s/g,'').includes('販売商品数'));
+  const listMap=new Map(), otherMap=new Map();
+
+  rows.forEach(row=>{
+    const cat=(row['カテゴリー']||'').trim();
+    const name=(row['商品名']||'').trim().replace(/22~1/g,'22-1');
+    const n=+row[cntCol]||0; if(!n) return;
+
+    if(cat==='その他'){
+      otherMap.set(name,(otherMap.get(name)||0)+n);
+    }else{
+      listMap.set(cat,(listMap.get(cat)||0)+n);
+    }
+  });
+
+  const list=[...listMap.entries()].map(([label,cnt])=>({label,cnt,priceId:id(label)}));
+  otherMap.forEach((cnt,label)=>list.push({label,cnt,priceId:id(label)}));
+
+  if(!list.find(o=>o.label.includes('フリー')))
+     list.push({label:'フリー',cnt:0,priceId:null});
+
+  return list.sort((a,b)=>sortKey(a.label).localeCompare(sortKey(b.label),'ja')||
+                         a.label.localeCompare(b.label,'ja'));
 }
 
-/* 合計金額計算 */
+/* ---- 表生成 ---- */
+function makeTable(arr){
+  tbody.innerHTML='';
+  arr.forEach(o=>{
+    const lock=o.label.includes('フリー');
+    const tr=document.createElement('tr');
+    tr.innerHTML=
+     `<td>${o.label}</td><td>${o.cnt}</td>`+
+     `<td>${lock?0:`<input type=number id=${o.priceId} value=0>`}</td>`;
+    tbody.appendChild(tr);
+    if(!lock) document.getElementById(o.priceId).oninput=calc;
+  });
+}
+
+/* ---- 合計金額 ---- */
 function calc(){
- let sum=0;
- tbody.querySelectorAll('tr').forEach(tr=>{
-   const label=tr.cells[0].textContent.trim();
-   const n    =+tr.cells[1].textContent;
-   let price  =0;
-   const inp  =tr.querySelector('input');
-   if(inp) price=+inp.value||0;
-   else if(label.includes('フリー')) price=0;
-   sum+=n*price;
- });
- document.getElementById('total').textContent=`合計金額: ${sum.toLocaleString()} 円`;
+  let sum=0;
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    const label=tr.cells[0].textContent.trim();
+    const n    =+tr.cells[1].textContent;
+    let price  =0;
+    const inp  =tr.querySelector('input');
+    if(inp) price=+inp.value||0;
+    else if(label.includes('フリー')) price=0;
+    sum+=n*price;
+  });
+  document.getElementById('total').textContent=`合計金額: ${sum.toLocaleString()} 円`;
 }
 </script>
 </body>
